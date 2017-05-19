@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import unicode_literals
 
+import os
 from blockext import *
 import serial
 import thread
@@ -37,7 +38,10 @@ def serial_proc():
     global acc_y
     global acc_z
 
-    PORT = "/dev/ttyACM0"
+    if os.name == "nt":
+        PORT = "COM7"
+    else:
+        PORT = "/dev/ttyACM0"
     #
     BAUD = 115200
     s = serial.Serial(PORT)
@@ -60,6 +64,20 @@ def serial_proc():
 
 def run_server():
     extension.run_forever(debug=True)
+
+def get_decorated_blocks_from_class(cls, selectors=None):
+    if selectors:
+        cls_vars = vars(cls)
+        values = map(cls_vars.get, selectors)
+    else:
+        values = vars(cls).values()
+
+    functions = []
+    for value in values:
+        if callable(value) and hasattr(value, '_block'):
+            functions.append(value)
+    functions.sort(key=lambda func: func._block_id)
+    return [f._block for f in functions]
 
 descriptor = Descriptor(
         name="Simple Micro:bit Extension",
