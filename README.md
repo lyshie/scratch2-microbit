@@ -15,6 +15,7 @@ Scratch2 - Micro:bit extension
 - [Scratch Extension](https://wiki.scratch.mit.edu/wiki/Scratch_Extension)
 - [Creating Scratch 2.0 Extensions](https://wiki.scratch.mit.edu/w/images/ExtensionsDoc.HTTP-9-11.pdf)
 - [micro:bit game controller with Scratch](https://www.raspberrypi.org/learning/microbit-game-controller/)
+- [How to read the micro:bit's serial output from your computer](https://www.microbit.co.uk/td/serial-library)
 
 ### 4. Author
 HSIEH, Li-Yi
