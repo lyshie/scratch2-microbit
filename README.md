@@ -7,7 +7,8 @@ Scratch2 - Micro:bit extension
     `# python microbit_ext.py`
 
 ### 2. Import extension
-* Import `microbit.s2e` extension, create your Scratch2 project (sample project `microbit.sb2`).
+* Import `microbit.s2e` extension, create your Scratch2 project (sample project `microbit_sample.sb2`).
+![s2mb.png](screenshots/s2mb.png)
 
 ### 3. Reference
 - [Scratch Extension](https://wiki.scratch.mit.edu/wiki/Scratch_Extension)
