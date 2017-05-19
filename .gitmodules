@@ -1,0 +1,3 @@
+[submodule "blockext"]
+	path = blockext
+	url = https://github.com/blockext/blockext
