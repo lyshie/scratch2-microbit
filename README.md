@@ -9,6 +9,7 @@ Scratch2 - Micro:bit extension
 ### 2. Import extension
 * Import `microbit.s2e` extension, create your Scratch2 project (sample project `microbit_sample.sb2`).
 ![s2mb.png](screenshots/s2mb.png)
+* [使用 Micro:bit 控制 Scratch 2](https://www.youtube.com/watch?v=LmRsx7XCMOM)
 
 ### 3. Reference
 - [Scratch Extension](https://wiki.scratch.mit.edu/wiki/Scratch_Extension)
