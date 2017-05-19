@@ -2,6 +2,12 @@
 Scratch2 - Micro:bit extension
 
 ### 1. Create your own Scratch2 extension
+* Install requirements
+
+    `# pip install blockext==0.2.0a2`
+
+    `# pip install pyserial`
+
 * `microbit_ext.py` (using [blockext](https://github.com/blockext/blockext))
 
     `# python microbit_ext.py`
