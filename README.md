@@ -27,6 +27,8 @@ Scratch2 - Micro:bit extension
 [Scratch controller with Micro:bit over BLE (Bluetooth Low Energy)](https://youtu.be/kHZFJNNkeDY)
 
 ```
+$ wget https://github.com/sandeepmistry/node-bbc-microbit/raw/master/firmware/node-bbc-microbit-v0.1.0.hex
+$ cp node-bbc-microbit-v0.1.0.hex /run/media/lyshie/MICROBIT
 $ pip install --user --upgrade "pygatt==3.1.1"
 $ pip install --user --upgrade "pygatt[GATTTOOL]"
 $ sudo python ./microbit_ext_ble.py D6:AF:43:58:57:9F
