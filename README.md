@@ -24,9 +24,15 @@ Scratch2 - Micro:bit extension
 - [How to read the micro:bit's serial output from your computer](https://www.microbit.co.uk/td/serial-library)
 
 ### 4. BLE (Bluetooth Low Energy)
-[Scratch controller with Micro:bit over BLE (Bluetooth Low Energy)](https://youtu.be/kHZFJNNkeDY)
+* [Scratch controller with Micro:bit over BLE (Bluetooth Low Energy)](https://youtu.be/VrInYbzWn1I)
+* [Scratch controller with Micro:bit over BLE (Bluetooth Low Energy)](https://youtu.be/DNTm0LNZBUU)
+* [Scratch controller with Micro:bit over BLE (Bluetooth Low Energy)](https://youtu.be/kHZFJNNkeDY)
 
 ```
+$ modprobe -r btusb
+$ modprobe btusb
+$ sudo rfkill unblock all
+
 $ wget https://github.com/sandeepmistry/node-bbc-microbit/raw/master/firmware/node-bbc-microbit-v0.1.0.hex
 $ cp node-bbc-microbit-v0.1.0.hex /run/media/lyshie/MICROBIT
 $ pip install --user --upgrade "pygatt==3.1.1"
