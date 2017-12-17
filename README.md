@@ -24,6 +24,7 @@ Scratch2 - Micro:bit extension (with BLE)
 - [How to read the micro:bit's serial output from your computer](https://www.microbit.co.uk/td/serial-library)
 
 ### 4. BLE (Bluetooth Low Energy)
+![s2mb_ble.png](screenshots/s2mb_ble.png)
 * [Scratch controller with Micro:bit over BLE (Bluetooth Low Energy)](https://youtu.be/VrInYbzWn1I)
 * [Scratch controller with Micro:bit over BLE (Bluetooth Low Energy)](https://youtu.be/DNTm0LNZBUU)
 * [Scratch controller with Micro:bit over BLE (Bluetooth Low Energy)](https://youtu.be/kHZFJNNkeDY)
