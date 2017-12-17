@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 
 import os
 import sys
+import re
 from blockext import *
 import thread
 
@@ -34,6 +35,15 @@ temperature = 0
 device = None
 
 MICROBIT_ACCELEROMETER_TILT_TOLERANCE = 200
+LED_STATE = [
+    "0 (-----)",
+    "1 (----*)",
+    "2 (---*-)",
+    "4 (--*--)",
+    "8 (-*---)",
+    "16 (*----)",
+    "24 (*****)",
+]
 
 
 class MicroBit:
@@ -103,15 +113,19 @@ class MicroBit:
     def led_matrix_pattern(self, matrix_pattern):
         command_queue.append("led_matrix_pattern\0{}".format(matrix_pattern))
 
-    @command("Set LED Matrix X %d.matrix_x Y %d.matrix_y State %d.matrix_state")
-    def led_matrix(self, matrix_x=0, matrix_y=0, matrix_state=0):
-        if matrix_x > 0 and matrix_x <= 5:
-            if matrix_y > 0 and matrix_y <= 5:
-                command_queue.append("led_matrix\0{}\0{}\0{}".format(
-                    matrix_state, matrix_x, matrix_y))
+    @command("Set LED Matrix %d.led_row1 %d.led_row2 %d.led_row3 %d.led_row4 %d.led_row5")
+    def led_matrix(self, led_row1=0, led_row2=0, led_row3=0, led_row4=0, led_row5=0):
+        led_row1 = re.sub(r"\D", "", led_row1)
+        led_row2 = re.sub(r"\D", "", led_row2)
+        led_row3 = re.sub(r"\D", "", led_row3)
+        led_row4 = re.sub(r"\D", "", led_row4)
+        led_row5 = re.sub(r"\D", "", led_row5)
+        command_queue.append("led_matrix\0{}\0{}\0{}\0{}\0{}".format(
+            led_row1, led_row2, led_row3, led_row4, led_row5))
 
     @command("Clear Display %d.clear_type")
     def clear_display(self, clear_type=0):
+        clear_type = re.sub(r"\D", "", clear_type)
         command_queue.append("clear_display\0{}".format(clear_type))
 
 '''
@@ -139,6 +153,11 @@ LED_MATRIX_PATTERN = {
     'Arrow Right': bytearray([0x04, 0x02, 0x1F, 0x02, 0x04]),  # ->
     'Arrow Up': bytearray([0x04, 0x0E, 0x15, 0x04, 0x04]),
     'Arrow Down': bytearray([0x04, 0x04, 0x15, 0x0E, 0x04]),
+    'Yes': bytearray([0x00, 0x01, 0x02, 0x14, 0x08]),  # v
+    'No': bytearray([0x11, 0x0A, 0x04, 0x0A, 0x11]),  # x
+    'Square (Large)': bytearray([0x1F, 0x11, 0x11, 0x11, 0x1F]),
+    'Square (Medium)': bytearray([0x00, 0x0E, 0x0A, 0x0E, 0x00]),
+    'Square (Small)': bytearray([0x00, 0x00, 0x04, 0x00, 0x00]),
 }
 
 
@@ -194,7 +213,6 @@ def ble_proc():
         adapter.start()
         device = adapter.connect(
             sys.argv[1], address_type=pygatt.BLEAddressType.random)
-        device_handle = device
         device.subscribe(BLE_CHAR['BUTTON_A'],
                          callback=handle_button_a)
         device.subscribe(BLE_CHAR['BUTTON_B'],
@@ -203,6 +221,7 @@ def ble_proc():
                          callback=handle_accelerometer)
         device.subscribe(BLE_CHAR['TEMPERATURE'],
                          callback=handle_temperature)
+
         while True:
             try:
                 cmd_line = command_queue.pop()
@@ -242,9 +261,14 @@ def process_command(cmd_line):
         else:
             device.char_write(BLE_CHAR['LED_MATRIX'], bytearray(
                 [0xFF, 0xFF, 0xFF, 0xFF, 0xFF]), wait_for_response=False)
+    elif cmd == "led_matrix":
+        device.char_write(BLE_CHAR['LED_MATRIX'], bytearray(
+            [int(args[0]), int(args[1]), int(args[2]), int(args[3]), int(args[4])]), wait_for_response=False)
     elif cmd == "led_matrix_pattern":
         device.char_write(BLE_CHAR['LED_MATRIX'], LED_MATRIX_PATTERN[
                           args[0]], wait_for_response=False)
+        value = device.char_read(BLE_CHAR['LED_MATRIX'])
+        print("OK{}".format(binascii.hexlify(value)))
 
 
 def run_server():
@@ -270,11 +294,14 @@ descriptor = Descriptor(
     port=12345,
     blocks=get_decorated_blocks_from_class(MicroBit),
     menus=dict(
-        matrix_x=[1, 2, 3, 4, 5],
-        matrix_y=[1, 2, 3, 4, 5],
-        matrix_state=[0, 1],
-        matrix_pattern=['Arrow Left', 'Arrow Right', 'Arrow Up', 'Arrow Down'],
-        clear_type={0: "on", 1: "off"},
+        matrix_pattern=['Arrow Left', 'Arrow Right',
+                        'Arrow Up', 'Arrow Down', "Yes", "No", "Square (Large)", "Square (Medium)", "Square (Small)"],
+        clear_type=["0 (off)", "1 (on)"],
+        led_row1=LED_STATE,
+        led_row2=LED_STATE,
+        led_row3=LED_STATE,
+        led_row4=LED_STATE,
+        led_row5=LED_STATE,
     )
 )
 
