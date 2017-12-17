@@ -1,5 +1,5 @@
-# scratch2-microbit
-Scratch2 - Micro:bit extension
+# scratch2-microbit (with BLE)
+Scratch2 - Micro:bit extension (with BLE)
 
 ### 1. Create your own Scratch2 extension
 * Install requirements
