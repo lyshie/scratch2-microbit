@@ -7,51 +7,61 @@ from __future__ import unicode_literals
 import os
 import sys
 import re
-from blockext import *
+import time
 import _thread
 
-'''
-URL:
-    https://github.com/peplin/pygatt
-'''
+# Scratch 2.0 extension
+from blockext import *
+
+# Python wrapper for gatttool
+# https://github.com/peplin/pygatt
 import pygatt
-import time
 from pygatt.util import *
 import binascii
 
-'''
-Thread-Safe
-'''
+# Thread-safe list-like container
 from collections import deque
 
 
 class MicroBit(object):
-    MICROBIT_ACCELEROMETER_TILT_TOLERANCE = 200
     '''
-    URL:
-        https://lancaster-university.github.io/microbit-docs/resources/bluetooth/bluetooth_profile.html
+    References:
+        1. Bluetooth Developer Studio Level 3 Profile Report
+           https://lancaster-university.github.io/microbit-docs/resources/bluetooth/bluetooth_profile.html
+        2. BBC micro:bit Bluetooth Profile - GATT Services
         https://lancaster-university.github.io/microbit-docs/ble/profile/#gatt-services
     '''
-    BLE_CHAR = {
-        # 0 = not pressed, 1 = pressed, 2 = long
-        'BUTTON_A': 'E95DDA90-251D-470A-A062FA1922DFA9A8',
-        'BUTTON_B': 'E95DDA91-251D-470A-A062FA1922DFA9A8',
-        # Signed integer 8 bit value in degrees celsius
+    BLE_UUID = {
+        # uint8 (0 = not pressed, 1 = pressed, 2 = long)
+        'BUTTON_A_STATE': 'E95DDA90-251D-470A-A062FA1922DFA9A8',
+        'BUTTON_B_STATE': 'E95DDA91-251D-470A-A062FA1922DFA9A8',
+        # sint8 (degrees celsius)
         'TEMPERATURE':    'E95D9250-251D-470A-A062FA1922DFA9A8',
-        # X, Y, Z => 3 signed 16 bit values
+        # uint16 (milliseconds)
+        'TEMPERATURE_PERIOD':    'E95D1B25-251D-470A-A062FA1922DFA9A8',
+        # sint16, sint16, sint16 (X, Y, Z) should be divided by 1000
         'ACCELEROMETER':  'E95DCA4B-251D-470A-A062FA1922DFA9A8',
-        # 1, 2, 5, 10, 20, 80, 160 and 640
+        # uint16 (1, 2, 5, 10, 20, 80, 160 and 640)
         'ACCELEROMETER_PERIOD':  'E95DFB24-251D-470A-A062FA1922DFA9A8',
-        # UTF-8, Maximum length 20 octets.
+        # utf8s (maximum length 20 octets)
         'LED_TEXT': 'E95D93EE-251D-470A-A062FA1922DFA9A8',
-        'LED_MATRIX': 'E95D7B77-251D-470A-A062FA1922DFA9A8',
-        # X, Y, Z => 3 signed 16 bit values
+        # uint8[]
+        # arrow left
+        # 000_0_0100 => 0x40
+        # 000_0_1000 => 0x80
+        # 000_1_1111 => 0x1F
+        # 000_0_1000 => 0x80
+        # 000_0_0100 => 0x40
+        'LED_MATRIX_STATE': 'E95D7B77-251D-470A-A062FA1922DFA9A8',
+        # sint16, sint16, sint16 (X, Y, Z)
         'MAGNETOMETER': 'E95DFB11-251D-470A-A062FA1922DFA9A8',
-        # 1, 2, 5, 10, 20, 80, 160 and 640
+        # uint16 (1, 2, 5, 10, 20, 80, 160 and 640)
         'MAGNETOMETER_PERIOD': 'E95D386C-251D-470A-A062FA1922DFA9A8',
-        # degrees from North: uint16
+        # uint16 (degrees from North)
         'MAGNETOMETER_BEARING': 'E95D9715-251D-470A-A062FA1922DFA9A8',
     }
+
+    ACCELEROMETER_TILT_TOLERANCE = 200
 
     LED_STATE = [
         "0 (-----)",
@@ -76,62 +86,83 @@ class MicroBit(object):
     }
 
     def __init__(self, mac_address):
+        # bluetooth MAC address
         self.mac_address = mac_address
 
+        # accelerometer
         self.acc_x = 0
         self.acc_y = 0
         self.acc_z = 0
+
+        # magnetometer
         self.mag_x = 0
         self.mag_y = 0
         self.mag_z = 0
         self.mag_bearing = 0
+
+        # button a and b
         self.button_a = 0
         self.button_b = 0
+
+        # temperature
         self.temperature = 0
+
+        # bluetooth device
         self.device = None
+
+        # command output buffer to microbit
         self.command_queue = deque(list(), maxlen=100)
 
     def hex2uint(self, byte_array):
-        '''
-            Convert bytearray to unsigned integer (8 bits, 16 bits)
-        '''
+        '''Convert bytearray to unsigned integer (8 bits, 16 bits)'''
         v = int(binascii.hexlify(byte_array), 16)
         return v
 
     def hex2sint(self, byte_array):
-        '''
-            Convert bytearray to signed integer (16bits)
-        '''
+        '''Convert bytearray to signed integer (16bits)'''
         v = int(binascii.hexlify(byte_array), 16)
         if v & 0x8000 == 0x8000:
             v = -((v ^ 0xffff) + 1)
         return v
 
     def handle_button_a(self, handle, value):
+        '''callback for button_a state'''
         self.button_a = self.hex2uint(bytearray([value[0]]))
 
     def handle_button_b(self, handle, value):
+        '''callback for button_b state'''
         self.button_b = self.hex2uint(bytearray([value[0]]))
 
     def handle_accelerometer(self, handle, value):
+        '''callback for accelerometer'''
         '''
-        URL:
-            http://microbit-challenges.readthedocs.io/en/latest/tutorials/accelerometer.html
-            https://os.mbed.com/users/fbeaufort/code/microbit-ble-open/file/04376b21995b/source/drivers/MicroBitAccelerometer.cpp/
+        References:
+            1. MicroPython - Accelerometer
+               http://microbit-challenges.readthedocs.io/en/latest/tutorials/accelerometer.html
+            2. MBed OS - source/drivers/MicroBitAccelerometer.cpp
+               https://os.mbed.com/users/fbeaufort/code/microbit-ble-open/file/04376b21995b/source/drivers/MicroBitAccelerometer.cpp/
         '''
         self.acc_x = self.hex2sint(bytearray([value[1], value[0]]))
         self.acc_y = self.hex2sint(bytearray([value[3], value[2]]))
         self.acc_z = self.hex2sint(bytearray([value[5], value[4]]))
 
     def handle_temperature(self, handle, value):
+        '''callback for temperature'''
         self.temperature = self.hex2sint(bytearray([value[0]]))
 
     def handle_magnetometer(self, handle, value):
+        '''callback for magnetometer'''
+        '''
+        References:
+            1. Create a Digital Compass with the Raspberry Pi – Part 2 – “Tilt Compensation”
+               http://ozzmaker.com/compass2/
+        '''
         self.mag_x = self.hex2sint(bytearray([value[1], value[0]]))
         self.mag_y = self.hex2sint(bytearray([value[3], value[2]]))
         self.mag_z = self.hex2sint(bytearray([value[5], value[4]]))
 
     def handle_magnetometer_bearing(self, handle, value):
+        '''callback for magnetometer bearing'''
         self.mag_bearing = self.hex2uint(bytearray([value[1], value[0]]))
 
 # global instance of MicroBit
@@ -162,27 +193,27 @@ class MicroBitExtension:
 
     @predicate("Tilted Left?")
     def tilt_left(self):
-        return self.microbit.acc_x < (0 - MicroBit.MICROBIT_ACCELEROMETER_TILT_TOLERANCE)
+        return self.microbit.acc_x < (0 - MicroBit.ACCELEROMETER_TILT_TOLERANCE)
 
     @predicate("Tilted Right?")
     def tilt_right(self):
-        return self.microbit.acc_x > MicroBit.MICROBIT_ACCELEROMETER_TILT_TOLERANCE
+        return self.microbit.acc_x > MicroBit.ACCELEROMETER_TILT_TOLERANCE
 
     @predicate("Tilted Down?")
     def tilt_down(self):
-        return self.microbit.acc_y < (0 - MicroBit.MICROBIT_ACCELEROMETER_TILT_TOLERANCE)
+        return self.microbit.acc_y < (0 - MicroBit.ACCELEROMETER_TILT_TOLERANCE)
 
     @predicate("Tilted Up?")
     def tilt_up(self):
-        return self.microbit.acc_y > MicroBit.MICROBIT_ACCELEROMETER_TILT_TOLERANCE
+        return self.microbit.acc_y > MicroBit.ACCELEROMETER_TILT_TOLERANCE
 
     @predicate("Face Up?")
     def face_up(self):
-        return self.microbit.acc_z < (0 - MicroBit.MICROBIT_ACCELEROMETER_TILT_TOLERANCE)
+        return self.microbit.acc_z < (0 - MicroBit.ACCELEROMETER_TILT_TOLERANCE)
 
     @predicate("Face Down?")
     def face_down(self):
-        return self.microbit.acc_z > MicroBit.MICROBIT_ACCELEROMETER_TILT_TOLERANCE
+        return self.microbit.acc_z > MicroBit.ACCELEROMETER_TILT_TOLERANCE
 
     @reporter("X-Accelerometer")
     def acc_x(self):
@@ -250,17 +281,17 @@ def ble_proc():
         adapter.start()
         device = adapter.connect(
             microbit.mac_address, address_type=pygatt.BLEAddressType.random)
-        device.subscribe(MicroBit.BLE_CHAR['BUTTON_A'],
+        device.subscribe(MicroBit.BLE_UUID['BUTTON_A_STATE'],
                          callback=microbit.handle_button_a)
-        device.subscribe(MicroBit.BLE_CHAR['BUTTON_B'],
+        device.subscribe(MicroBit.BLE_UUID['BUTTON_B_STATE'],
                          callback=microbit.handle_button_b)
-        device.subscribe(MicroBit.BLE_CHAR['ACCELEROMETER'],
+        device.subscribe(MicroBit.BLE_UUID['ACCELEROMETER'],
                          callback=microbit.handle_accelerometer)
-        device.subscribe(MicroBit.BLE_CHAR['TEMPERATURE'],
+        device.subscribe(MicroBit.BLE_UUID['TEMPERATURE'],
                          callback=microbit.handle_temperature)
-        device.subscribe(MicroBit.BLE_CHAR['MAGNETOMETER'],
+        device.subscribe(MicroBit.BLE_UUID['MAGNETOMETER'],
                          callback=microbit.handle_magnetometer)
-        device.subscribe(MicroBit.BLE_CHAR['MAGNETOMETER_BEARING'],
+        device.subscribe(MicroBit.BLE_UUID['MAGNETOMETER_BEARING'],
                          callback=microbit.handle_magnetometer_bearing)
 
         microbit.device = device
@@ -292,22 +323,23 @@ def process_command(cmd_line):
         return
 
     if cmd == "scroll_text":
-        microbit.device.char_write(MicroBit.BLE_CHAR['LED_TEXT'], bytearray(
+        microbit.device.char_write(MicroBit.BLE_UUID['LED_TEXT'], bytearray(
             b"{}".format(args[0])), wait_for_response=False)
     elif cmd == "clear_display":
         if args[0] == "0":
-            microbit.device.char_write(MicroBit.BLE_CHAR['LED_MATRIX'], bytearray(
+            microbit.device.char_write(MicroBit.BLE_UUID['LED_MATRIX_STATE'], bytearray(
                 [0x00, 0x00, 0x00, 0x00, 0x00]), wait_for_response=False)
         else:
-            microbit.device.char_write(MicroBit.BLE_CHAR['LED_MATRIX'], bytearray(
+            microbit.device.char_write(MicroBit.BLE_UUID['LED_MATRIX_STATE'], bytearray(
                 [0xFF, 0xFF, 0xFF, 0xFF, 0xFF]), wait_for_response=False)
     elif cmd == "led_matrix":
-        microbit.device.char_write(MicroBit.BLE_CHAR['LED_MATRIX'], bytearray(
+        microbit.device.char_write(MicroBit.BLE_UUID['LED_MATRIX_STATE'], bytearray(
             [int(args[0]), int(args[1]), int(args[2]), int(args[3]), int(args[4])]), wait_for_response=False)
     elif cmd == "led_matrix_pattern":
-        microbit.device.char_write(MicroBit.BLE_CHAR['LED_MATRIX'], MicroBit.LED_MATRIX_PATTERN[
+        microbit.device.char_write(MicroBit.BLE_UUID['LED_MATRIX_STATE'], MicroBit.LED_MATRIX_PATTERN[
             args[0]], wait_for_response=False)
-        value = microbit.device.char_read(MicroBit.BLE_CHAR['LED_MATRIX'])
+        value = microbit.device.char_read(
+            MicroBit.BLE_UUID['LED_MATRIX_STATE'])
 
 
 def run_server():
